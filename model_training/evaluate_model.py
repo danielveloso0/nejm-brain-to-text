@@ -21,7 +21,7 @@ parser.add_argument('--data_dir', type=str, default='../data/hdf5_data_final',
 parser.add_argument('--eval_type', type=str, default='test', choices=['val', 'test'],
                     help='Evaluation type: "val" for validation set, "test" for test set. '
                          'If "test", ground truth is not available.')
-parser.add_argument('--csv_path', type=str, default='../data/t15_copyTaskData_description.csv',
+parser.add_argument('--csv_path', type=str, default='/data/t15_copyTaskData_description.csv',
                     help='Path to the CSV file with metadata about the dataset (relative to the current working directory).')
 parser.add_argument('--gpu_number', type=int, default=1,
                     help='GPU number to use for RNN model inference. Set to -1 to use CPU.')
@@ -269,6 +269,8 @@ if eval_type == 'val':
 
 # write predicted sentences to a csv file. put a timestamp in the filename (YYYYMMDD_HHMMSS)
 output_file = os.path.join(model_path, f'baseline_rnn_{eval_type}_predicted_sentences_{time.strftime("%Y%m%d_%H%M%S")}.csv')
+
 ids = [i for i in range(len(lm_results['pred_sentence']))]
 df_out = pd.DataFrame({'id': ids, 'text': lm_results['pred_sentence']})
 df_out.to_csv(output_file, index=False)
+print('Done')
