@@ -57,11 +57,11 @@ class BrainToTextDecoder_Trainer:
 
         # Create output directory
         if args['mode'] == 'train':
-            os.makedirs(self.args['output_dir'], exist_ok=False)
+            os.makedirs(self.args['output_dir'], exist_ok=True)
 
         # Create checkpoint directory
         if args['save_best_checkpoint'] or args['save_all_val_steps'] or args['save_final_model']: 
-            os.makedirs(self.args['checkpoint_dir'], exist_ok=False)
+            os.makedirs(self.args['checkpoint_dir'], exist_ok=True)
 
         # Set up logging
         self.logger = logging.getLogger(__name__)
