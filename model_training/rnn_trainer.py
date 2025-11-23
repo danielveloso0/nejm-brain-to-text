@@ -119,7 +119,7 @@ class BrainToTextDecoder_Trainer:
             torch.manual_seed(self.args['seed'])
 
         # Initialize the model 
-        self.model = GRUDecoder(
+        self.model = GRUCNNDecoder(
             neural_dim = self.args['model']['n_input_features'],
             n_units = self.args['model']['n_units'],
             n_days = len(self.args['dataset']['sessions']),
