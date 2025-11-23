@@ -145,7 +145,7 @@ class GRUCNNDecoder(nn.Module):
                  patch_size = 0,
                  patch_stride = 0,
                  ):
-        super(GRUDecoder, self).__init__()
+        super(GRUCNNDecoder, self).__init__()
         
         self.neural_dim = neural_dim      # 512 normalmente
         self.n_units = n_units
