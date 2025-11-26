@@ -256,5 +256,107 @@ class GRUCNNDecoder(nn.Module):
             return logits, hidden_states
         
         return logits
+# LSTM model
+class LSTMDecoder(nn.Module):
+    def __init__(self,
+                 neural_dim,
+                 n_units,
+                 n_days,
+                 n_classes,
+                 rnn_dropout=0.0,
+                 input_dropout=0.0,
+                 n_layers=5,
+                 patch_size=0,
+                 patch_stride=0):
+        super(LSTMDecoder, self).__init__()
+
+        self.neural_dim = neural_dim
+        self.n_units = n_units
+        self.n_classes = n_classes
+        self.n_layers = n_layers
+        self.n_days = n_days
+
+        self.rnn_dropout = rnn_dropout
+        self.input_dropout = input_dropout
+
+        self.patch_size = patch_size
+        self.patch_stride = patch_stride
+
+        self.day_layer_activation = nn.Softsign()
+
+        self.day_weights = nn.ParameterList(
+            [nn.Parameter(torch.eye(self.neural_dim)) for _ in range(self.n_days)]
+        )
+        self.day_biases = nn.ParameterList(
+            [nn.Parameter(torch.zeros(1, self.neural_dim)) for _ in range(self.n_days)]
+        )
+
+        self.day_layer_dropout = nn.Dropout(input_dropout)
+
+        self.input_size = self.neural_dim
+        if self.patch_size > 0:
+            self.input_size *= self.patch_size
+
+        ### 🔁 SUBSTITUIÇÃO DO GRU POR LSTM ###
+        self.lstm = nn.LSTM(
+            input_size=self.input_size,
+            hidden_size=self.n_units,
+            num_layers=self.n_layers,
+            dropout=self.rnn_dropout,
+            batch_first=True,
+            bidirectional=False,
+        )
+
+        # Inicialização ortogonal como antes
+        for name, param in self.lstm.named_parameters():
+            if "weight_hh" in name:
+                nn.init.orthogonal_(param)
+            if "weight_ih" in name:
+                nn.init.xavier_uniform_(param)
+
+        self.out = nn.Linear(self.n_units, self.n_classes)
+        nn.init.xavier_uniform_(self.out.weight)
+
+        ### 🔁 LSTM PRECISA DE DOIS ESTADOS: h0 E c0 ###
+        self.h0 = nn.Parameter(torch.zeros(self.n_layers, 1, self.n_units))
+        nn.init.xavier_uniform_(self.h0)
+
+        self.c0 = nn.Parameter(torch.zeros(self.n_layers, 1, self.n_units))
+        nn.init.xavier_uniform_(self.c0)
+
+    def forward(self, x, day_idx, states=None, return_state=False):
+        day_weights = torch.stack([self.day_weights[i] for i in day_idx], dim=0)
+        day_biases = torch.cat([self.day_biases[i] for i in day_idx], dim=0).unsqueeze(1)
+
+        x = torch.einsum("btd,bdk->btk", x, day_weights) + day_biases
+        x = self.day_layer_activation(x)
+
+        if self.input_dropout > 0:
+            x = self.day_layer_dropout(x)
+
+        if self.patch_size > 0:
+            x = x.unsqueeze(1)
+            x = x.permute(0, 3, 1, 2)
+            x_unfold = x.unfold(3, self.patch_size, self.patch_stride)
+            x_unfold = x_unfold.squeeze(2)
+            x_unfold = x_unfold.permute(0, 2, 3, 1)
+            x = x_unfold.reshape(x.size(0), x_unfold.size(1), -1)
+
+        ### 🔁 ESTADOS DO LSTM ###
+        if states is None:
+            h0 = self.h0.expand(self.n_layers, x.shape[0], self.n_units).contiguous()
+            c0 = self.c0.expand(self.n_layers, x.shape[0], self.n_units).contiguous()
+            states = (h0, c0)
+
+        ### 🔁 FORWARD DO LSTM ###
+        output, (hn, cn) = self.lstm(x, states)
+
+        logits = self.out(output)
+
+        if return_state:
+            return logits, (hn, cn)
+
+        return logits
+
 
 

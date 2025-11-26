@@ -56,7 +56,7 @@ else:
     device = torch.device('cpu')
 
 # define model
-model = GRUDecoder(
+model = GRUCNNDecoder(
     neural_dim = model_args['model']['n_input_features'],
     n_units = model_args['model']['n_units'], 
     n_days = len(model_args['dataset']['sessions']),
