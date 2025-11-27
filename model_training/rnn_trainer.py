@@ -526,7 +526,7 @@ class BrainToTextDecoder_Trainer:
             day_indicies = batch['day_indicies'].to(self.device)
 
             # Use autocast for efficiency
-            with torch.autocast(device_type = "cuda", enabled = self.args['use_amp'], dtype = torch.bfloat16):
+            with torch.autocast(device_type = "cuda", enabled = self.args['use_amp'], dtype = torch.float16):
 
                 # Apply augmentations to the data
                 features, n_time_steps = self.transform_data(features, n_time_steps, 'train')
@@ -703,7 +703,7 @@ class BrainToTextDecoder_Trainer:
             
             with torch.no_grad():
 
-                with torch.autocast(device_type = "cuda", enabled = self.args['use_amp'], dtype = torch.bfloat16):
+                with torch.autocast(device_type = "cuda", enabled = self.args['use_amp'], dtype = torch.float16):
                     features, n_time_steps = self.transform_data(features, n_time_steps, 'val')
 
                     adjusted_lens = ((n_time_steps - self.args['model']['patch_size']) / self.args['model']['patch_stride'] + 1).to(torch.int32)
