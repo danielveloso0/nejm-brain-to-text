@@ -390,7 +390,7 @@ class BrainToTextDecoder_Trainer:
         '''
         Save a training checkpoint
         '''
-
+        
         checkpoint = {
             'model_state_dict' : self.model.state_dict(),
             'optimizer_state_dict' : self.optimizer.state_dict(),
@@ -485,11 +485,14 @@ class BrainToTextDecoder_Trainer:
         
         return features, n_time_steps
 
-    def train(self):
+    def train(self,saved_path=None):
         '''
         Train the model 
         '''
 
+        if saved_path is not None:
+            self.load_model_checkpoint(saved_path)
+            
         # Set model to train mode (specificially to make sure dropout layers are engaged)
         self.model.train()
 
