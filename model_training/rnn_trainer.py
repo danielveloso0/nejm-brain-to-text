@@ -22,7 +22,7 @@ torch.set_float32_matmul_precision('high') # makes float32 matmuls faster on som
 torch.backends.cudnn.deterministic = True # makes training more reproducible
 torch._dynamo.config.cache_size_limit = 64
 
-from rnn_model import GRUDecoder, GRUCNNDecoder, LSTMDecoder
+from rnn_model import GRUDecoder, GRUCNNDecoder, LSTMDecoder, Wav2VecBrain
 
 class BrainToTextDecoder_Trainer:
     """
@@ -31,7 +31,7 @@ class BrainToTextDecoder_Trainer:
     Written by Nick Card and Zachery Fogg with reference to Stanford NPTL's decoding function
     """
 
-    def __init__(self, args):
+    def __init__(self, args, model=None):
         '''
         args : dictionary of training arguments
         '''
@@ -118,7 +118,9 @@ class BrainToTextDecoder_Trainer:
             random.seed(self.args['seed'])
             torch.manual_seed(self.args['seed'])
 
-        # Initialize the model 
+        # Initialize the model
+        if model is not None:
+            self.model = model
         self.model = LSTMDecoder(
             neural_dim = self.args['model']['n_input_features'],
             n_units = self.args['model']['n_units'],

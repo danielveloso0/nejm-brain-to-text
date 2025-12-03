@@ -1,5 +1,6 @@
 import torch 
 from torch import nn
+from transformers import Wav2Vec2ForCTC
 
 class GRUDecoder(nn.Module):
     '''
@@ -356,6 +357,113 @@ class LSTMDecoder(nn.Module):
         if return_state:
             return logits, (hn, cn)
 
+        return logits
+class Wav2VecBrain(nn.Module):
+    def __init__(self,
+                 neural_dim,
+                 n_units,
+                 n_days,
+                 n_classes,
+                 rnn_dropout = 0.0,
+                 input_dropout = 0.0,
+                 n_layers = 5, 
+                 patch_size = 0,
+                 patch_stride = 0,
+                 ):
+        super(Wav2VecBrain, self).__init__()
+        
+        self.neural_dim = neural_dim      # 512 normalmente
+        self.n_units = n_units
+        self.n_classes = n_classes
+        self.n_layers = n_layers 
+        self.n_days = n_days
+
+        self.rnn_dropout = rnn_dropout
+        self.input_dropout = input_dropout
+        
+        self.patch_size = patch_size
+        self.patch_stride = patch_stride
+
+        # ---------------------------------------------------
+        # FRONT-END (PARTE NOVA)
+        
+        # load pretrained model (weights)
+        self.model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h")
+
+        # capture dimensions
+        self.hidden_size = self.model.config.hidden_size  # e.g., 768
+        self.in_dim = neural_dim
+        self.num_labels = n_classes
+
+        # Replace the lm_head to fit our number of labels
+        self.model.lm_head = nn.Linear(self.hidden_size, self.n_classes)
+
+        # Adapter: project from in_dim -> hidden_size
+        # We use a small conv1d or linear applied per time step.
+        # Using Linear preserves T length (no downsampling).
+        self.front_end = nn.Sequential(
+            nn.LayerNorm(neural_dim),
+            nn.Linear(neural_dim, self.hidden_size),
+            nn.GELU(),
+            nn.Dropout(self.rnn_dropout),
+        )
+        # ---------------------------------------------------
+
+        # DAY LAYERS
+        self.day_layer_activation = nn.Softsign()
+
+        self.day_weights = nn.ParameterList(
+            [nn.Parameter(torch.eye(self.neural_dim)) for _ in range(self.n_days)]
+        )
+        self.day_biases = nn.ParameterList(
+            [nn.Parameter(torch.zeros(1, self.neural_dim)) for _ in range(self.n_days)]
+        )
+
+        self.day_layer_dropout = nn.Dropout(input_dropout)
+        
+        self.input_size = self.neural_dim
+
+        if self.patch_size > 0:
+            self.input_size *= self.patch_size
+
+
+        self.out = nn.Linear(self.n_units, self.n_classes)
+        nn.init.xavier_uniform_(self.out.weight)
+
+        self.h0 = nn.Parameter(nn.init.xavier_uniform_(torch.zeros(1, 1, self.n_units)))
+    def forward(self, x, day_idx, attention_mask=None, states=None, return_state=False):
+        # DAY LAYER
+        
+        day_weights = torch.stack([self.day_weights[i] for i in day_idx], dim=0)
+        day_biases = torch.cat([self.day_biases[i] for i in day_idx], dim=0).unsqueeze(1)
+
+        x = torch.einsum("btd,bdk->btk", x, day_weights) + day_biases
+        x = self.day_layer_activation(x)
+        if self.input_dropout > 0:
+            x = self.day_layer_dropout(x)
+
+        # PATCHING (opcional)
+        if self.patch_size > 0:
+            x = x.unsqueeze(1)                      
+            x = x.permute(0, 3, 1, 2)               
+            x_unfold = x.unfold(3, self.patch_size, self.patch_stride)
+            x_unfold = x_unfold.squeeze(2)
+            x_unfold = x_unfold.permute(0, 2, 3, 1)
+            x = x_unfold.reshape(x.size(0), x_unfold.size(1), -1)
+        x = self.front_end(x)
+        if attention_mask is not None:
+            attention_mask = attention_mask.to(self.device).to(torch.bool)
+
+        # Call encoder
+        
+        encoder = self.model.wav2vec2.encoder
+        encoder_outputs = encoder(hidden_states=x, attention_mask=attention_mask, output_attentions=False, output_hidden_states=False)
+        # encoder_outputs.last_hidden_state shape: [B, T', hidden_size]  (T' == T here)
+
+        last_hidden = encoder_outputs.last_hidden_state  # [B, T, hidden]
+
+        # lm_head to logits
+        logits = self.model.lm_head(last_hidden)  # [B, T, num_labels]
         return logits
 
 
