@@ -22,7 +22,7 @@ torch.set_float32_matmul_precision('high') # makes float32 matmuls faster on som
 torch.backends.cudnn.deterministic = True # makes training more reproducible
 torch._dynamo.config.cache_size_limit = 64
 
-from rnn_model import GRUDecoder, GRUCNNDecoder, LSTMDecoder, Wav2VecBrain
+from rnn_model import GRUDecoder, GRUCNNDecoder, LSTMDecoder
 
 class BrainToTextDecoder_Trainer:
     """
@@ -113,6 +113,7 @@ class BrainToTextDecoder_Trainer:
 
 
         # Set seed if provided 
+
         if self.args['seed'] != -1:
             np.random.seed(self.args['seed'])
             random.seed(self.args['seed'])
