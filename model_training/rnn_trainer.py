@@ -121,9 +121,10 @@ class BrainToTextDecoder_Trainer:
         # Initialize the model
         if model is not None:
             self.model = model
-        self.model = LSTMDecoder(
-            neural_dim = self.args['model']['n_input_features'],
-            n_units = self.args['model']['n_units'],
+        else:
+            self.model = LSTMDecoder(
+                neural_dim = self.args['model']['n_input_features'],
+                n_units = self.args['model']['n_units'],
             n_days = len(self.args['dataset']['sessions']),
             n_classes  = self.args['dataset']['n_classes'],
             rnn_dropout = self.args['model']['rnn_dropout'], 
@@ -131,7 +132,7 @@ class BrainToTextDecoder_Trainer:
             n_layers = self.args['model']['n_layers'],
             patch_size = self.args['model']['patch_size'],
             patch_stride = self.args['model']['patch_stride'],
-        )
+           )
 
         # Call torch.compile to speed up training
         self.logger.info("Using torch.compile")
