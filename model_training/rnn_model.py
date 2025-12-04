@@ -397,13 +397,17 @@ class Wav2VecBrain(nn.Module):
 
         # Replace the lm_head to fit our number of labels
         self.model.lm_head = nn.Linear(self.hidden_size, self.n_classes)
-
+          # compute input dimension after patching
+        if self.patch_size > 0:
+            self.fe_input_dim = self.neural_dim * self.patch_size
+        else:
+            self.fe_input_dim = self.neural_dim
         # Adapter: project from in_dim -> hidden_size
         # We use a small conv1d or linear applied per time step.
         # Using Linear preserves T length (no downsampling).
         self.front_end = nn.Sequential(
-            nn.LayerNorm(neural_dim),
-            nn.Linear(neural_dim, self.hidden_size),
+            nn.LayerNorm(self.fe_input_dim),
+            nn.Linear(self.fe_input_dim, self.hidden_size),
             nn.GELU(),
             nn.Dropout(self.rnn_dropout),
         )
